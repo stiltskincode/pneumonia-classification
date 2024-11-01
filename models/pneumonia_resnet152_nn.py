@@ -1,10 +1,10 @@
 import torch
+from torch import nn
 import torchvision
 import torchmetrics
-import lightning as L
 
 
-class PneumoniaResNet152(L.LightningModule):
+class PneumoniaResNet152NN(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = torchvision.models.resnet152()
@@ -16,11 +16,10 @@ class PneumoniaResNet152(L.LightningModule):
 
         self.train_acc = torchmetrics.Accuracy(task="binary")
         self.val_acc = torchmetrics.Accuracy(task="binary")
-
     def forward(self, data):
         return self.model(data)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch):
         x_ray, label = batch
         x_ray = x_ray.float()
         label = label.float()
@@ -28,15 +27,15 @@ class PneumoniaResNet152(L.LightningModule):
         loss = self.loss_fn(pred, label)
         acc = self.train_acc(torch.sigmoid(pred), label.int())
 
-        self.log("Train Loss", loss)
-        self.log("Step Train ACC", acc)
+        print(f"Train Loss: {loss.item():.4f}")
+        print(f"Step Train ACC: {acc:.4f}")
 
         return loss
 
     def on_train_epoch_end(self):
         self.log("Training ACC", self.train_acc.compute())
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch):
         x_ray, label = batch
         x_ray = x_ray.float()
         label = label.float()
@@ -44,13 +43,10 @@ class PneumoniaResNet152(L.LightningModule):
         loss = self.loss_fn(pred, label)
         acc = self.val_acc(torch.sigmoid(pred), label)
 
-        self.log("VAL Loss", loss)
-        self.log("Step VAL ACC", acc)
+        print("VAL Loss", loss)
+        print("Step VAL ACC", acc)
 
         return loss
 
     def on_validation_epoch_end(self):
-        self.log("VAL ACC", self.val_acc.compute())
-
-    def configure_optimizers(self):
-        return [self.optimizer]
+        print("VAL ACC", self.val_acc.compute())
