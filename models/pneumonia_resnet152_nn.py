@@ -16,6 +16,7 @@ class PneumoniaResNet152NN(nn.Module):
 
         self.train_acc = torchmetrics.Accuracy(task="binary")
         self.val_acc = torchmetrics.Accuracy(task="binary")
+
     def forward(self, data):
         return self.model(data)
 
