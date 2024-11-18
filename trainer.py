@@ -13,6 +13,7 @@ class Trainer:
         self.device = device
         self.checkpoints_path = checkpoints_path
         self.top_losses = []
+        self.start_epoch = 0
 
     def save_top_checkpoints(self, epoch, loss):
         if not os.path.exists(self.checkpoints_path):
@@ -35,6 +36,17 @@ class Trainer:
                 'loss': loss
             }, checkpoint_path)
             print(f"Checkpoint saved for epoch {epoch} with loss {loss:.4f}")
+
+    def load_checkpoint(self, checkpoint_path):
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.start_epoch = checkpoint['epoch']
+        print(f"Checkpoint loaded: {checkpoint_path} (Epoch: {self.start_epoch}, Loss: {checkpoint['loss']:.4f})")
+
 
     def train_one_epoch(self, dataloader):
         self.model.train()
@@ -63,7 +75,7 @@ class Trainer:
         return running_loss / len(dataloader.dataset)
 
     def fit(self, train_loader, val_loader, epochs):
-        for epoch in range(epochs):
+        for epoch in range(self.start_epoch, epochs):
             print(f"Epoch {epoch + 1}/{epochs}")
             train_loss = self.train_one_epoch(train_loader)
             val_loss = self.validate(val_loader)
