@@ -11,8 +11,8 @@ class PneumoniaResNet152NN(nn.Module):
         self.model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         self.model.fc = torch.nn.Linear(in_features=2048, out_features=1, bias=True)
 
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
-        self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3]))
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
+        # self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3]))
 
         self.train_acc = torchmetrics.Accuracy(task="binary")
         self.val_acc = torchmetrics.Accuracy(task="binary")
@@ -28,6 +28,9 @@ class PneumoniaResNet152NN(nn.Module):
         loss = self.loss_fn(pred, label)
         acc = self.train_acc(torch.sigmoid(pred), label.int())
 
+        loss.backward()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
         print(f"Train Loss: {loss.item():.4f}")
         print(f"Step Train ACC: {acc:.4f}")
 
