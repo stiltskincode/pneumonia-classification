@@ -47,12 +47,11 @@ class Trainer:
         self.start_epoch = checkpoint['epoch']
         print(f"Checkpoint loaded: {checkpoint_path} (Epoch: {self.start_epoch}, Loss: {checkpoint['loss']:.4f})")
 
-
     def train_one_epoch(self, dataloader):
         self.model.train()
         running_loss = 0.0
         for inputs, targets in tqdm(dataloader, desc="Training"):
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
+            inputs, targets = inputs.to(self.device).float(), targets.to(self.device).float()
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             outputs = torch.sigmoid(outputs)
@@ -82,5 +81,3 @@ class Trainer:
 
             self.save_top_checkpoints(epoch + 1, val_loss)
             print(f"Train Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
-
-
