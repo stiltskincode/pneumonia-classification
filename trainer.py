@@ -5,11 +5,14 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.notebook import tqdm
 
+
 class Trainer:
-    def __init__(self, model, criterion, optimizer, device, checkpoints_path="checkpoints"):
+    def __init__(self, model, criterion, optimizer, scaler, scheduler, device, checkpoints_path="checkpoints"):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
+        self.scaler = scaler
+        self.scheduler = scheduler
         self.device = device
         self.checkpoints_path = checkpoints_path
         self.top_losses = []
@@ -48,30 +51,57 @@ class Trainer:
         print(f"Checkpoint loaded: {checkpoint_path} (Epoch: {self.start_epoch}, Loss: {checkpoint['loss']:.4f})")
 
     def train_one_epoch(self, dataloader, epoch):
+        # self.model.train()
+        # scaler = torch.amp.GradScaler(device=self.device)  # Skaler do FP16
+        # running_loss = 0.0
+        # progress_bar = tqdm(dataloader, desc=f"Training epoch {epoch}", leave=True)
+        # for data, target in progress_bar:
+        #     data = data.to(self.device).float()
+        #     target = target.float().unsqueeze(1).to(self.device)
+        #     self.optimizer.zero_grad()
+        #
+        #     with torch.amp.autocast(device_type='cuda' if self.device.type == 'cuda' else 'cpu'):  # Autocast dla FP16
+        #         output = self.model(data)
+        #         output = torch.sigmoid(output)
+        #         loss = self.criterion(output, target)
+        #
+        #     # outputs = self.model(inputs)
+        #     # outputs = torch.sigmoid(outputs)
+        #     # loss = self.criterion(outputs, targets)
+        #     # loss.backward()
+        #     # self.optimizer.step()
+        #     scaler.scale(loss).backward()
+        #     scaler.step(self.optimizer)
+        #     scaler.update()
+        #     running_loss += loss.item() * data.size(0)
+        # return running_loss / len(dataloader.dataset)
+
         self.model.train()
-        scaler = torch.amp.GradScaler(device=self.device)  # Skaler do FP16
         running_loss = 0.0
-        progress_bar = tqdm(dataloader, desc=f"Training epoch {epoch}", leave=True)
+        progress_bar = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
+
         for data, target in progress_bar:
             data = data.to(self.device).float()
             target = target.float().unsqueeze(1).to(self.device)
+
             self.optimizer.zero_grad()
 
             with torch.amp.autocast(device_type='cuda' if self.device.type == 'cuda' else 'cpu'):  # Autocast dla FP16
                 output = self.model(data)
-                output = torch.sigmoid(output)
                 loss = self.criterion(output, target)
 
-            # outputs = self.model(inputs)
-            # outputs = torch.sigmoid(outputs)
-            # loss = self.criterion(outputs, targets)
-            # loss.backward()
-            # self.optimizer.step()
-            scaler.scale(loss).backward()
-            scaler.step(self.optimizer)
-            scaler.update()
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
             running_loss += loss.item() * data.size(0)
-        return running_loss / len(dataloader.dataset)
+            progress_bar.set_postfix({'Loss': loss.item()})
+
+        epoch_loss = running_loss / len(dataloader.dataset)
+        print(f"Epoch {epoch}, Average Loss: {epoch_loss:.4f}")
+
+        return epoch_loss
+
 
     def validate(self, dataloader):
         self.model.eval()
@@ -80,6 +110,7 @@ class Trainer:
             for inputs, targets in tqdm(dataloader, desc="Validation"):
                 inputs = inputs.to(self.device).float()
                 targets = targets.to(self.device).float()
+
                 outputs = self.model(inputs)
                 outputs = torch.sigmoid(outputs)
                 loss = self.criterion(outputs, targets)
@@ -89,7 +120,8 @@ class Trainer:
     def fit(self, train_loader, val_loader, epochs):
         for epoch in range(self.start_epoch, epochs):
             print(f"Epoch {epoch + 1}/{epochs}")
-            train_loss = self.train_one_epoch(train_loader)
+            train_loss = self.train_one_epoch(train_loader, epoch)
+            self.scheduler.step(train_loss)
             val_loss = self.validate(val_loader)
 
             self.save_top_checkpoints(epoch + 1, val_loss)
