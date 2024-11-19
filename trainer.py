@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 class Trainer:
     def __init__(self, model, criterion, optimizer, device, checkpoints_path="checkpoints"):
@@ -47,18 +47,30 @@ class Trainer:
         self.start_epoch = checkpoint['epoch']
         print(f"Checkpoint loaded: {checkpoint_path} (Epoch: {self.start_epoch}, Loss: {checkpoint['loss']:.4f})")
 
-    def train_one_epoch(self, dataloader):
+    def train_one_epoch(self, dataloader, epoch):
         self.model.train()
+        scaler = torch.amp.GradScaler(device=self.device)  # Skaler do FP16
         running_loss = 0.0
-        for inputs, targets in tqdm(dataloader, desc="Training"):
-            inputs, targets = inputs.to(self.device).float(), targets.to(self.device).float()
+        progress_bar = tqdm(dataloader, desc=f"Training epoch {epoch}", leave=True)
+        for data, target in progress_bar:
+            data = data.to(self.device).float()
+            target = target.float().unsqueeze(1).to(self.device)
             self.optimizer.zero_grad()
-            outputs = self.model(inputs)
-            outputs = torch.sigmoid(outputs)
-            loss = self.criterion(outputs, targets)
-            loss.backward()
-            self.optimizer.step()
-            running_loss += loss.item() * inputs.size(0)
+
+            with torch.amp.autocast(device_type='cuda' if self.device.type == 'cuda' else 'cpu'):  # Autocast dla FP16
+                output = self.model(data)
+                output = torch.sigmoid(output)
+                loss = self.criterion(output, target)
+
+            # outputs = self.model(inputs)
+            # outputs = torch.sigmoid(outputs)
+            # loss = self.criterion(outputs, targets)
+            # loss.backward()
+            # self.optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(self.optimizer)
+            scaler.update()
+            running_loss += loss.item() * data.size(0)
         return running_loss / len(dataloader.dataset)
 
     def validate(self, dataloader):
