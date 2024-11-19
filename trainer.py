@@ -78,7 +78,8 @@ class Trainer:
         running_loss = 0.0
         with torch.no_grad():
             for inputs, targets in tqdm(dataloader, desc="Validation"):
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                inputs = inputs.to(self.device).float()
+                targets = targets.to(self.device).float()
                 outputs = self.model(inputs)
                 outputs = torch.sigmoid(outputs)
                 loss = self.criterion(outputs, targets)
