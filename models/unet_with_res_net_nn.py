@@ -4,8 +4,10 @@ from torchvision import models
 
 
 class UNetWithResNet(nn.Module):
-    def __init__(self, resnet_type="resnet152", num_classes=1, dropout_rate=0.1):
+    def __init__(self, resnet_type="resnet152", num_classes=1, dropout_rate=0.1, bounding_box_dropout=0.5):
         super(UNetWithResNet, self).__init__()
+
+        self.bounding_box_dropout = bounding_box_dropout
 
         if resnet_type == "resnet18":
             resnet = models.resnet18(pretrained=True)
@@ -25,7 +27,8 @@ class UNetWithResNet(nn.Module):
         else:
             raise ValueError(f"Unsupported ResNet type: {resnet_type}")
 
-        resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        resnet.conv1 = nn.Conv2d(2, 64, kernel_size=7, stride=2, padding=3, bias=False)
         nn.init.kaiming_normal_(resnet.conv1.weight, mode='fan_out', nonlinearity='relu')
 
         self.encoder = nn.ModuleDict({
@@ -62,7 +65,16 @@ class UNetWithResNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-    def forward(self, x):
+    def forward(self, x, bounding_box_mask=None):
+        if bounding_box_mask is None:
+            bounding_box_mask = torch.zeros_like(x)
+
+        if self.training and self.bounding_box_dropout > 0:
+            dropout = nn.Dropout2d(p=self.bounding_box_dropout)
+            bounding_box_mask = dropout(bounding_box_mask)
+
+        x = torch.cat([x, bounding_box_mask], dim=1)
+
         # Encoder
         enc1 = self.encoder["enc1"](x)
         enc2 = self.encoder["enc2"](enc1)
