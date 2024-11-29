@@ -4,7 +4,7 @@ from torchvision import models
 
 
 class UNetWithResNet(nn.Module):
-    def __init__(self, resnet_type="resnet152", num_classes=1):
+    def __init__(self, resnet_type="resnet152", num_classes=1, dropout_rate=0.1):
         super(UNetWithResNet, self).__init__()
 
         if resnet_type == "resnet18":
@@ -43,20 +43,21 @@ class UNetWithResNet(nn.Module):
 
         self.decoder = nn.ModuleDict({
             "upconv4": nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2),
-            "dec4": self._decoder_block(encoder_channels[-2] + 512, 512),
+            "dec4": self._decoder_block(encoder_channels[-2] + 512, 512, dropout_rate),
             "upconv3": nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
-            "dec3": self._decoder_block(encoder_channels[-3] + 256, 256),
+            "dec3": self._decoder_block(encoder_channels[-3] + 256, 256, dropout_rate),
             "upconv2": nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
-            "dec2": self._decoder_block(encoder_channels[-4] + 128, 128),
+            "dec2": self._decoder_block(encoder_channels[-4] + 128, 128, dropout_rate),
             "upconv1": nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
-            "dec1": self._decoder_block(encoder_channels[-5] + 64, 64),
+            "dec1": self._decoder_block(encoder_channels[-5] + 64, 64, dropout_rate),
             "final_conv": nn.Conv2d(64, num_classes, kernel_size=1)
         })
 
-    def _decoder_block(self, in_channels, out_channels):
+    def _decoder_block(self, in_channels, out_channels, dropout_rate=0.1):
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
+            nn.Dropout(p=dropout_rate),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True)
         )
