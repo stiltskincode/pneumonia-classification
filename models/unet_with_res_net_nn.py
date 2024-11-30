@@ -4,7 +4,7 @@ from torchvision import models
 
 
 class UNetWithResNet(nn.Module):
-    def __init__(self, resnet_type="resnet152", num_classes=1, dropout_rate=0.1, bounding_box_dropout=0.5):
+    def __init__(self, resnet_type="resnet152", num_classes=1, dropout_rate=0.1, bounding_box_dropout=0.5, img_size=512):
         super(UNetWithResNet, self).__init__()
 
         self.bounding_box_dropout = bounding_box_dropout
@@ -56,6 +56,9 @@ class UNetWithResNet(nn.Module):
             "final_conv": nn.Conv2d(64, num_classes, kernel_size=1)
         })
 
+        # Warstwa przeskalowująca do wymaganego IMG_SIZE
+        self.upsample_to_img_size = nn.Upsample(size=(img_size, img_size), mode='bilinear', align_corners=False)
+
     def _decoder_block(self, in_channels, out_channels, dropout_rate=0.1):
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
@@ -99,5 +102,6 @@ class UNetWithResNet(nn.Module):
         enc1_resized = torch.nn.functional.interpolate(enc1, size=dec1.shape[2:], mode='bilinear', align_corners=False)
         dec1 = self.decoder["dec1"](torch.cat([dec1, enc1_resized], dim=1))
 
-        return self.decoder["final_conv"](dec1)
+        final_output = self.upsample_to_img_size(self.decoder["final_conv"](dec1))
+        return final_output
 
