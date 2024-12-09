@@ -96,6 +96,8 @@ class UNetWithResNetAttentionCBAM(nn.Module):
             "final_conv": nn.Conv2d(64, num_classes, kernel_size=1),
         })
 
+        self.final_conv = nn.Conv2d(64, num_classes, kernel_size=1)
+
     def _decoder_block(self, in_channels, out_channels, dropout_rate=0.1, attention=False):
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
@@ -134,5 +136,8 @@ class UNetWithResNetAttentionCBAM(nn.Module):
         dec1 = self.decoder["dec1"](torch.cat([dec1, enc1_resized], dim=1))
 
         # Final output with 2 channels (pneumonia mask + bounding box mask)
-        return self.decoder["final_conv"](dec1)
+
+        x = self.decoder["final_conv"](dec1)
+        x = torch.nn.functional.interpolate(x, size=(512, 512), mode='bilinear', align_corners=False)
+        return x
 
